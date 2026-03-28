@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lightbulb, Zap, Shield, Target, Play } from 'lucide-react';
+import { Lightbulb, Zap, Shield, Target, Play, Clock } from 'lucide-react';
 
 interface PreGameTipsProps {
   opponent: { username: string; elo: number };
@@ -35,6 +35,20 @@ const TIPS = [
     text: "Don't just use simple words. Higher tiers give significantly more points!",
     color: "text-purple-500",
     bg: "bg-purple-50"
+  },
+  {
+    icon: Clock,
+    title: "ENDURANCE",
+    text: "Matches now last 2 minutes! Keep your focus and keep those words coming.",
+    color: "text-rose-500",
+    bg: "bg-rose-50"
+  },
+  {
+    icon: Play,
+    title: "COMBO",
+    text: "Submit words within the turn timer to keep your momentum going!",
+    color: "text-indigo-500",
+    bg: "bg-indigo-50"
   }
 ];
 
@@ -52,7 +66,7 @@ export default function PreGameTips({ opponent, onStart }: PreGameTipsProps) {
 
   return (
     <div className="min-h-screen bg-page-bg flex items-center justify-center p-6">
-      <div className="max-w-4xl w-full space-y-12">
+      <div className="max-w-6xl w-full space-y-12">
         <div className="text-center space-y-4">
           <motion.div
             initial={{ y: -20, opacity: 0 }}
@@ -67,7 +81,7 @@ export default function PreGameTips({ opponent, onStart }: PreGameTipsProps) {
           <p className="text-xl font-bold text-slate-500 italic">Master these tips before the duel begins...</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {TIPS.map((tip, i) => (
             <motion.div
               key={tip.title}

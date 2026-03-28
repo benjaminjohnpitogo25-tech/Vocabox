@@ -11,9 +11,19 @@ export default function MusicPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const generateMusic = async () => {
-    setIsLoading(true);
-    setError(null);
     try {
+      // Check if API key is selected for Lyria models
+      const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
+      if (!hasKey) {
+        await (window as any).aistudio?.openSelectKey();
+        // After opening the dialog, we assume the user might have selected a key.
+        // The platform will inject the key into process.env.API_KEY or process.env.GEMINI_API_KEY
+      }
+
+      setIsLoading(true);
+      setError(null);
+      
+      // Create a new instance to ensure it uses the most up-to-date key
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContentStream({
         model: "lyria-3-pro-preview",
@@ -45,9 +55,17 @@ export default function MusicPlayer() {
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
       setIsPlaying(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Music generation error:", err);
-      setError("Failed to load music");
+      
+      // If permission denied or model not found, it's likely an API key issue
+      if (err.message?.includes("PERMISSION_DENIED") || err.message?.includes("Requested entity was not found")) {
+        setError("Please select a paid Gemini API key to generate music.");
+        // Prompt to select key again
+        await (window as any).aistudio?.openSelectKey();
+      } else {
+        setError("Failed to load music");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +107,16 @@ export default function MusicPlayer() {
         </button>
         
         <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-full mb-4 left-0 bg-red-50 border-2 border-red-200 text-red-600 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap"
+            >
+              {error}
+            </motion.div>
+          )}
           {isPlaying && !isLoading && (
             <motion.div 
               initial={{ opacity: 0, x: -20 }}

@@ -19,7 +19,8 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
   const [words, setWords] = useState<any[]>([]);
   const [score, setScore] = useState(0);
   const [oppScore, setOppScore] = useState(0);
-  const [timer, setTimer] = useState(10);
+  const [timer, setTimer] = useState(15);
+  const [matchTimeLeft, setMatchTimeLeft] = useState(120);
   const [stunned, setStunned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
       const them = data.players.find((p: any) => p.id !== socket.id);
       setScore(me.score);
       setOppScore(them.score);
-      setTimer(10); // Reset timer on word update
+      setTimer(15); // Reset timer on word update
       setError(null);
     });
 
@@ -56,10 +57,15 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
       setTimer(prev => Math.max(0, prev - 0.1));
     }, 100);
 
+    const matchInterval = setInterval(() => {
+      setMatchTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
+
     return () => {
       socket.off("word_update");
       socket.off("stunned");
       clearInterval(interval);
+      clearInterval(matchInterval);
     };
   }, [socket]);
 
@@ -96,8 +102,8 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
             <div className="flex items-center gap-2">
               <div className="w-32 h-4 bg-slate-200 border-2 border-slate-900 rounded-full overflow-hidden">
                 <motion.div 
-                  animate={{ width: `${(timer / 10) * 100}%` }}
-                  className={cn("h-full transition-colors", timer < 3 ? "bg-primary" : "bg-secondary")}
+                  animate={{ width: `${(timer / 15) * 100}%` }}
+                  className={cn("h-full transition-colors", timer < 4 ? "bg-primary" : "bg-secondary")}
                 />
               </div>
               <span className="font-bold text-xl text-emerald-600">{score} pts</span>
@@ -106,6 +112,12 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
         </div>
 
         <div className="flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock className="w-4 h-4 text-slate-400" />
+            <span className="font-mono font-bold text-slate-500">
+              {Math.floor(matchTimeLeft / 60)}:{(matchTimeLeft % 60).toString().padStart(2, '0')}
+            </span>
+          </div>
           <div className="w-20 h-20 bg-accent border-4 border-slate-900 rounded-[2rem] flex items-center justify-center text-5xl font-black shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
             {letter}
           </div>

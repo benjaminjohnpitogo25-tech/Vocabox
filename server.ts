@@ -53,7 +53,7 @@ async function startServer() {
         io.to(opponent.id).emit("match_found", { matchId, opponent: { username, elo }, letter: matchState.letter });
         io.to(socket.id).emit("match_found", { matchId, opponent: { username: opponent.username, elo: opponent.elo }, letter: matchState.letter });
 
-        // End match after 60 seconds
+        // End match after 120 seconds
         setTimeout(() => {
           const finalMatch = activeMatches.get(matchId);
           if (finalMatch && finalMatch.status === "active") {
@@ -78,7 +78,7 @@ async function startServer() {
             
             activeMatches.delete(matchId);
           }
-        }, 60000);
+        }, 120000);
       } else {
         waitingPlayer = { id: socket.id, username, elo };
         socket.emit("waiting_for_opponent");
@@ -196,7 +196,7 @@ async function startServer() {
         }
       }, difficulty === 'easy' ? 8000 + Math.random() * 4000 : (difficulty === 'hard' ? 3000 + Math.random() * 2000 : 5000 + Math.random() * 3000));
 
-      // End match after 60 seconds
+      // End match after 120 seconds
       setTimeout(() => {
         const finalMatch = activeMatches.get(matchId);
         if (finalMatch && finalMatch.status === "active") {
@@ -215,7 +215,7 @@ async function startServer() {
           
           activeMatches.delete(matchId);
         }
-      }, 60000);
+      }, 120000);
     });
 
     socket.on("submit_word", ({ matchId, word, tier }) => {
