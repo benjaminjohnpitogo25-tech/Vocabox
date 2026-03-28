@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user ranking, Elo, and vocabulary history.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "description": "Display name of the user." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "elo": { "type": "integer", "description": "Elo-based ranking points." },
+        "rank": { "type": "string", "enum": ["Seedling", "Speaker", "Poet", "Scholar", "Linguist", "Architect"], "description": "Current rank title." },
+        "vocaBank": { "type": "array", "items": { "type": "string" }, "description": "List of professional words used." },
+        "winStreak": { "type": "integer", "description": "Current number of consecutive wins." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the account was created." }
+      },
+      "required": ["username", "email", "elo", "rank"]
+    },
+    "Match": {
+      "title": "Match History",
+      "description": "Records of 1v1 duels.",
+      "type": "object",
+      "properties": {
+        "player1Id": { "type": "string" },
+        "player2Id": { "type": "string" },
+        "winnerId": { "type": "string" },
+        "score1": { "type": "integer" },
+        "score2": { "type": "integer" },
+        "letter": { "type": "string" },
+        "words": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "player": { "type": "string" },
+              "word": { "type": "string" },
+              "tier": { "type": "integer" },
+              "points": { "type": "integer" }
+            }
+          }
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["player1Id", "player2Id", "winnerId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles."
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Global match history."
+    }
+  }
+}

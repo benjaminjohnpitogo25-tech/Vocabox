@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Firebase Auth UID)
+    // Fields:
+    //   - username: string (required, 1-30 chars)
+    //   - email: string (required, valid email)
+    //   - elo: number (required, >= 0)
+    //   - rank: string (required, enum)
+    //   - vocaBank: list (required, strings)
+    //   - winStreak: number (required, >= 0)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: matches
+    // Document ID: auto-generated
+    // Fields:
+    //   - player1Id: string (required)
+    //   - player2Id: string (required)
+    //   - winnerId: string (required)
+    //   - score1: number (required)
+    //   - score2: number (required)
+    //   - letter: string (required, 1 char)
+    //   - words: list (required, objects)
+    //   - timestamp: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "benjaminjohn.pitogo.25@usjr.edu.ph" && request.auth.token.email_verified == true);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['username', 'email', 'elo', 'rank', 'vocaBank', 'winStreak', 'createdAt']) &&
+             data.username is string && data.username.size() >= 1 && data.username.size() <= 30 &&
+             isValidEmail(data.email) &&
+             data.elo is number && data.elo >= 0 &&
+             data.rank in ['Seedling', 'Speaker', 'Poet', 'Scholar', 'Linguist', 'Architect'] &&
+             data.vocaBank is list &&
+             data.winStreak is number && data.winStreak >= 0 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidMatch(data) {
+      return data.keys().hasAll(['player1Id', 'player2Id', 'winnerId', 'score1', 'score2', 'letter', 'words', 'timestamp']) &&
+             data.player1Id is string && data.player2Id is string &&
+             data.winnerId is string &&
+             data.score1 is number && data.score2 is number &&
+             data.letter is string && data.letter.size() == 1 &&
+             data.words is list &&
+             data.timestamp is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can read their own profile. Public profiles are restricted for now.
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can create their own profile with initial values.
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.elo == 1200 && 
+                      request.resource.data.rank == 'Speaker';
+      
+      // Users can update their own profile, but cannot change email or createdAt.
+      // Elo and rank updates are allowed for now (in a real app, these would be server-side).
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) &&
+                      request.resource.data.email == resource.data.email &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /matches/{matchId} {
+      // Matches are readable by the players involved.
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.player1Id || request.auth.uid == resource.data.player2Id || isAdmin());
+      
+      // Matches can be created by a player involved.
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.player1Id || request.auth.uid == request.resource.data.player2Id) &&
+                      isValidMatch(request.resource.data);
+      
+      // Matches are immutable.
+      allow update, delete: if false;
+    }
+  }
+}
