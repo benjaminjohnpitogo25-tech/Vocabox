@@ -22,6 +22,7 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
   const [timer, setTimer] = useState(10);
   const [stunned, setStunned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,11 +35,17 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
       setScore(me.score);
       setOppScore(them.score);
       setTimer(10); // Reset timer on word update
+      setError(null);
     });
 
     socket.on("stunned", () => {
       setStunned(true);
       setTimeout(() => setStunned(false), 2000);
+    });
+
+    socket.on("word_error", (data: { message: string }) => {
+      setError(data.message);
+      setTimeout(() => setError(null), 3000);
     });
 
     socket.on("match_end", (results: any) => {
@@ -179,6 +186,21 @@ export default function Arena({ matchId, opponent, letter, socket, onMatchEnd, o
       {/* Input Zone */}
       <footer className="max-w-3xl mx-auto w-full">
         <form onSubmit={handleSubmit} className="relative">
+          <AnimatePresence>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="absolute -top-12 left-0 right-0 flex justify-center"
+              >
+                <div className="bg-coral-red text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {error}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <input 
             type="text"
             value={input}

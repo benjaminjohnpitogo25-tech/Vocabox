@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { io } from 'socket.io-client';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import Dashboard, { UserData, getRank } from './components/Dashboard';
 import Lobby from './components/Lobby';
 import Arena from './components/Arena';
 import Review from './components/Review';
 import ErrorBoundary from './components/ErrorBoundary';
+import MusicPlayer from './components/MusicPlayer';
+import PreGameTips from './components/PreGameTips';
 import { 
   auth, 
   db, 
@@ -24,10 +26,12 @@ import {
 } from './lib/firebase';
 import { LogIn, Loader2 } from 'lucide-react';
 
-type Screen = 'dashboard' | 'lobby' | 'arena' | 'review';
+type Screen = 'dashboard' | 'lobby' | 'arena' | 'review' | 'tips';
+type DashboardView = 'home' | 'voca-bank' | 'leaderboard';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('dashboard');
+  const [dashboardView, setDashboardView] = useState<DashboardView>('home');
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [matchData, setMatchData] = useState<any>(null);
@@ -50,7 +54,7 @@ export default function App() {
     socket.on("match_found", (data: any) => {
       console.log("Match found:", data);
       setMatchData(data);
-      setScreen('arena');
+      setScreen('tips');
     });
 
     socket.on("match_end", (finalResults: any) => {
@@ -79,8 +83,8 @@ export default function App() {
             const newUser: UserData = {
               username: firebaseUser.displayName || 'New Seedling',
               email: firebaseUser.email || '',
-              elo: 1200,
-              rank: 'Speaker',
+              elo: 0,
+              rank: 'Seedling',
               vocaBank: [],
               winStreak: 0,
               createdAt: serverTimestamp() as any
@@ -128,16 +132,25 @@ export default function App() {
     
     if (auth.currentUser && user) {
       const userRef = doc(db, 'users', auth.currentUser.uid);
-      // Only update Elo for real matches (not bot matches)
-      const isBotMatch = matchData?.opponent?.username === 'VocaBot';
-      const eloChange = isBotMatch ? 0 : finalResults.eloChange;
+      // Allow Elo changes for both real and bot matches
+      // "added every win" - we'll ensure elo only increases or stays same
+      const eloChange = Math.max(0, finalResults.eloChange);
       const newElo = user.elo + eloChange;
       const newRank = getRank(newElo).title;
+      
+      // Collect new words for Voca-Bank
+      const matchWords = finalResults.words
+        .filter((w: any) => w.player === 'You' || w.player === user.username)
+        .map((w: any) => w.word.toLowerCase());
+      
+      const currentVocaBank = user.vocaBank || [];
+      const newVocaBank = Array.from(new Set([...currentVocaBank, ...matchWords]));
       
       try {
         await updateDoc(userRef, {
           elo: newElo,
           rank: newRank,
+          vocaBank: newVocaBank,
           winStreak: finalResults.winner === 'You' ? (user.winStreak || 0) + 1 : 0
         });
       } catch (error) {
@@ -146,10 +159,24 @@ export default function App() {
     }
   };
 
-  const handlePractice = () => {
+  const handlePractice = (difficulty: string = 'medium') => {
     if (user && socket) {
-      console.log("Joining bot match...");
-      socket.emit("join_bot_match", { username: user.username, elo: user.elo });
+      console.log("Joining bot match with difficulty:", difficulty);
+      socket.emit("join_bot_match", { 
+        username: user.username, 
+        elo: user.elo,
+        difficulty 
+      });
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setScreen('dashboard');
+    } catch (error) {
+      console.error("Logout error:", error);
     }
   };
 
@@ -194,42 +221,95 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-page-bg">
-        {screen === 'dashboard' && (
-          <Dashboard 
-            user={user} 
-            onPlay={() => setScreen('lobby')} 
-            onPractice={handlePractice}
-          />
-        )}
-        
-        {screen === 'lobby' && user && (
-          <Lobby 
-            username={user.username} 
-            elo={user.elo} 
-            socket={socket}
-            onCancel={() => setScreen('dashboard')}
-          />
-        )}
+      <div className="min-h-screen bg-page-bg relative overflow-hidden">
+        <MusicPlayer />
+        <AnimatePresence mode="wait">
+          {screen === 'dashboard' && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              transition={{ type: "spring", damping: 20, stiffness: 100 }}
+            >
+              <Dashboard 
+                user={user} 
+                view={dashboardView}
+                onViewChange={setDashboardView}
+                onPlay={() => setScreen('lobby')} 
+                onPractice={handlePractice}
+                onLogout={handleLogout}
+              />
+            </motion.div>
+          )}
+          
+          {screen === 'lobby' && user && (
+            <motion.div
+              key="lobby"
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              transition={{ type: "spring", damping: 25, stiffness: 120 }}
+            >
+              <Lobby 
+                username={user.username} 
+                elo={user.elo} 
+                socket={socket}
+                onCancel={() => setScreen('dashboard')}
+              />
+            </motion.div>
+          )}
 
-        {screen === 'arena' && matchData && (
-          <Arena 
-            matchId={matchData.matchId}
-            opponent={matchData.opponent}
-            letter={matchData.letter}
-            socket={socket}
-            onMatchEnd={handleMatchEnd}
-            onForfeit={handleForfeit}
-          />
-        )}
+          {screen === 'tips' && matchData && (
+            <motion.div
+              key="tips"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.1 }}
+              transition={{ type: "spring", damping: 20, stiffness: 100 }}
+            >
+              <PreGameTips 
+                opponent={matchData.opponent}
+                onStart={() => setScreen('arena')}
+              />
+            </motion.div>
+          )}
 
-        {screen === 'review' && results && (
-          <Review 
-            results={results}
-            onHome={() => setScreen('dashboard')}
-            onRematch={() => setScreen('lobby')}
-          />
-        )}
+          {screen === 'arena' && matchData && (
+            <motion.div
+              key="arena"
+              initial={{ opacity: 0, scale: 1.2 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.5, ease: "circOut" }}
+            >
+              <Arena 
+                matchId={matchData.matchId}
+                opponent={matchData.opponent}
+                letter={matchData.letter}
+                socket={socket}
+                onMatchEnd={handleMatchEnd}
+                onForfeit={handleForfeit}
+              />
+            </motion.div>
+          )}
+
+          {screen === 'review' && results && (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              transition={{ type: "spring", damping: 20, stiffness: 100 }}
+            >
+              <Review 
+                results={results}
+                onHome={() => setScreen('dashboard')}
+                onRematch={() => setScreen('lobby')}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </ErrorBoundary>
   );

@@ -15,14 +15,38 @@
 
 @layer base {
   body {
-    @apply bg-page-bg text-slate-900;
+    @apply bg-page-bg text-slate-900 min-h-screen;
+    background-image: radial-gradient(#FF6B6B22 2px, transparent 2px);
+    background-size: 40px 40px;
   }
 }
 
 .cartoon-border {
-  @apply border-4 border-slate-900 rounded-[2rem] shadow-[8px_8px_0px_0px_rgba(15,23,42,1)];
+  @apply border-4 border-slate-900 rounded-[2rem] shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] bg-white;
 }
 
 .cartoon-button {
-  @apply border-4 border-slate-900 rounded-2xl shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all;
+  @apply border-4 border-slate-900 rounded-2xl shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all cursor-pointer;
+}
+
+.cartoon-card {
+  @apply border-4 border-slate-900 rounded-[2.5rem] shadow-[12px_12px_0px_0px_rgba(15,23,42,1)] bg-white overflow-hidden;
+}
+
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out infinite;
 }

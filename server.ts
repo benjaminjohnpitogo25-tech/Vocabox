@@ -43,6 +43,7 @@ async function startServer() {
           round: 1,
           letter: String.fromCharCode(65 + Math.floor(Math.random() * 26)),
           words: [],
+          usedWords: new Set<string>(),
           status: "active",
           startTime: Date.now()
         };
@@ -91,7 +92,7 @@ async function startServer() {
       }
     });
 
-    socket.on("join_bot_match", ({ username, elo }) => {
+    socket.on("join_bot_match", ({ username, elo, difficulty = 'medium' }) => {
       const matchId = `bot_match_${socket.id}_${Date.now()}`;
       const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
       
@@ -104,8 +105,10 @@ async function startServer() {
         round: 1,
         letter: letter,
         words: [],
+        usedWords: new Set<string>(),
         status: "active",
-        startTime: Date.now()
+        startTime: Date.now(),
+        difficulty
       };
 
       activeMatches.set(matchId, matchState);
@@ -124,55 +127,74 @@ async function startServer() {
           return;
         }
 
-        // Bot "thinks" and submits a word every 5-8 seconds
+        // Bot "thinks" and submits a word based on difficulty
         const botPlayer = match.players.find((p: any) => p.id === "bot_id");
-        const tiers = [1, 1, 1, 2, 2, 3]; // Weighted towards common words
-        const tier = tiers[Math.floor(Math.random() * tiers.length)];
-        const points = tier === 3 ? 5 : (tier === 2 ? 2 : 1);
-        
-        // In a real app, we'd use a dictionary or Gemini to get a real word.
-        // For this demo, we'll just simulate the score and a placeholder word.
         const placeholderWords: Record<string, string[]> = {
-          'A': ['Apple', 'Ancient', 'Architect'],
-          'B': ['Banana', 'Benevolent', 'Blueprint'],
-          'C': ['Cat', 'Courageous', 'Component'],
-          'D': ['Dog', 'Dazzling', 'Definition'],
-          'E': ['Egg', 'Eloquent', 'Ephemeral'],
-          'F': ['Fish', 'Flawless', 'Framework'],
-          'G': ['Goat', 'Glistening', 'Graduation'],
-          'H': ['Hat', 'Harmonious', 'Hierarchy'],
-          'I': ['Ice', 'Illustrious', 'Infrastructure'],
-          'J': ['Jar', 'Jovial', 'Jurisdiction'],
-          'K': ['Kite', 'Kindhearted', 'Knowledge'],
-          'L': ['Lion', 'Luminous', 'Linguist'],
-          'M': ['Moon', 'Majestic', 'Mastery'],
-          'N': ['Net', 'Nebulous', 'Navigation'],
-          'O': ['Owl', 'Omniscient', 'Optimization'],
-          'P': ['Pig', 'Picturesque', 'Prestige'],
-          'Q': ['Queen', 'Quaint', 'Query'],
-          'R': ['Rat', 'Radiant', 'Requirement'],
-          'S': ['Sun', 'Serene', 'Scholar'],
-          'T': ['Tree', 'Transcendent', 'Technology'],
-          'U': ['Up', 'Ubiquitous', 'Utility'],
-          'V': ['Van', 'Vibrant', 'Vocabulary'],
-          'W': ['Web', 'Wondrous', 'Workflow'],
-          'X': ['X-ray', 'Xenon', 'Xylophone'],
-          'Y': ['Yak', 'Yearning', 'Yield'],
-          'Z': ['Zebra', 'Zealous', 'Zenith']
+          'A': ['Apple', 'Ancient', 'Architect', 'Avenue', 'Action', 'Active', 'Artist', 'Aspect'],
+          'B': ['Banana', 'Benevolent', 'Blueprint', 'Bridge', 'Bright', 'Button', 'Better', 'Beyond'],
+          'C': ['Cat', 'Courageous', 'Component', 'Circle', 'Center', 'Create', 'Common', 'Client'],
+          'D': ['Dog', 'Dazzling', 'Definition', 'Device', 'Detail', 'Design', 'Direct', 'Double'],
+          'E': ['Egg', 'Eloquent', 'Ephemeral', 'Energy', 'Effect', 'Expert', 'Entire', 'Enable'],
+          'F': ['Fish', 'Flawless', 'Framework', 'Future', 'Factor', 'Figure', 'Finish', 'Follow'],
+          'G': ['Goat', 'Glistening', 'Graduation', 'Growth', 'Garden', 'Global', 'Gather', 'Gentle'],
+          'H': ['Hat', 'Harmonious', 'Hierarchy', 'Health', 'History', 'Happen', 'Highly', 'Handle'],
+          'I': ['Ice', 'Illustrious', 'Infrastructure', 'Impact', 'Inside', 'Island', 'Ignore', 'Intent'],
+          'J': ['Jar', 'Jovial', 'Jurisdiction', 'Journey', 'Journal', 'Justice', 'Jacket', 'Junior'],
+          'K': ['Kite', 'Kindhearted', 'Knowledge', 'Kitchen', 'Kingdom', 'Keynote', 'Keyword', 'Kinetic'],
+          'L': ['Lion', 'Luminous', 'Linguist', 'Library', 'Logical', 'Legend', 'Listen', 'Layout'],
+          'M': ['Moon', 'Majestic', 'Mastery', 'Modern', 'Method', 'Memory', 'Motion', 'Manage'],
+          'N': ['Net', 'Nebulous', 'Navigation', 'Nature', 'Notice', 'Normal', 'Number', 'Native'],
+          'O': ['Owl', 'Omniscient', 'Optimization', 'Object', 'Office', 'Option', 'Online', 'Output'],
+          'P': ['Pig', 'Picturesque', 'Prestige', 'Public', 'Player', 'Policy', 'Proper', 'Period'],
+          'Q': ['Queen', 'Quaint', 'Query', 'Quality', 'Quartz', 'Quiver', 'Quench', 'Quorum'],
+          'R': ['Rat', 'Radiant', 'Requirement', 'Recent', 'Report', 'Result', 'Review', 'Record'],
+          'S': ['Sun', 'Serene', 'Scholar', 'System', 'Simple', 'Social', 'Status', 'Source'],
+          'T': ['Tree', 'Transcendent', 'Technology', 'Target', 'Theory', 'Travel', 'Ticket', 'Timing'],
+          'U': ['Up', 'Ubiquitous', 'Utility', 'Unique', 'Update', 'Useful', 'Urgent', 'Unlock'],
+          'V': ['Van', 'Vibrant', 'Vocabulary', 'Vision', 'Volume', 'Values', 'Verify', 'Visual'],
+          'W': ['Web', 'Wondrous', 'Workflow', 'Window', 'Weight', 'Worker', 'Writer', 'Weekly'],
+          'X': ['X-ray', 'Xenon', 'Xylophone', 'Xerox', 'Xylem', 'Xenon', 'Xenon', 'Xenon'],
+          'Y': ['Yak', 'Yearning', 'Yield', 'Yellow', 'Youth', 'Yonder', 'Yearly', 'Yogurt'],
+          'Z': ['Zebra', 'Zealous', 'Zenith', 'Zigzag', 'Zodiac', 'Zephyr', 'Zinger', 'Zestful']
         };
 
         const wordList = placeholderWords[match.letter] || ['Word'];
-        const word = wordList[tier - 1] || wordList[0];
+        const availableWords = wordList.filter(w => !match.usedWords.has(w.toLowerCase()));
+        
+        if (availableWords.length === 0) return;
+
+        // Difficulty adjustments
+        let selectedWord;
+        if (difficulty === 'easy') {
+          // Easy: Prefer shorter words
+          const easyWords = availableWords.filter(w => w.length <= 5);
+          selectedWord = easyWords.length > 0 
+            ? easyWords[Math.floor(Math.random() * easyWords.length)]
+            : availableWords[Math.floor(Math.random() * availableWords.length)];
+        } else if (difficulty === 'hard') {
+          // Hard: Prefer longer words
+          const hardWords = availableWords.filter(w => w.length > 7);
+          selectedWord = hardWords.length > 0 
+            ? hardWords[Math.floor(Math.random() * hardWords.length)]
+            : availableWords[Math.floor(Math.random() * availableWords.length)];
+        } else {
+          selectedWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+        }
+
+        match.usedWords.add(selectedWord.toLowerCase());
+
+        const tier = selectedWord.length > 8 ? 3 : (selectedWord.length > 5 ? 2 : 1);
+        const points = tier === 3 ? 5 : (tier === 2 ? 2 : 1);
 
         botPlayer.score += points;
-        match.words.push({ player: "VocaBot", word, tier, points });
+        match.words.push({ player: "VocaBot", word: selectedWord, tier, points });
         
         io.to(socket.id).emit("word_update", { words: match.words, players: match.players });
         
         if (tier === 3) {
           socket.emit("stunned");
         }
-      }, 4000 + Math.random() * 4000); // Faster bot for practice
+      }, difficulty === 'easy' ? 8000 + Math.random() * 4000 : (difficulty === 'hard' ? 3000 + Math.random() * 2000 : 5000 + Math.random() * 3000));
 
       // End match after 60 seconds
       setTimeout(() => {
@@ -203,8 +225,16 @@ async function startServer() {
       const player = match.players.find((p: any) => p.id === socket.id);
       if (!player) return;
 
+      // Check if word was already used in this match
+      const normalizedWord = word.toLowerCase();
+      if (match.usedWords.has(normalizedWord)) {
+        socket.emit("word_error", { message: "Word already used!" });
+        return;
+      }
+
       // Basic validation: starts with letter
       if (word.toUpperCase().startsWith(match.letter)) {
+        match.usedWords.add(normalizedWord);
         const points = tier === 3 ? 5 : (tier === 2 ? 2 : 1);
         player.score += points;
         
